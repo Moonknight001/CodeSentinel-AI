@@ -29,6 +29,7 @@ JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", "1440"))  # 24 hours
 
 _bearer_scheme = HTTPBearer(auto_error=True)
+_bearer_scheme_optional = HTTPBearer(auto_error=False)
 
 # ---------------------------------------------------------------------------
 # Token helpers
@@ -73,23 +74,19 @@ def decode_access_token(token: str) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# FastAPI dependency
+# Shared core logic
 # ---------------------------------------------------------------------------
 
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
-    db: AsyncSession = Depends(get_db),
+async def _resolve_user_from_credentials(
+    credentials: HTTPAuthorizationCredentials,
+    db: AsyncSession,
 ):
     """
-    FastAPI dependency that validates the Bearer JWT and returns the
-    authenticated ``User`` ORM instance.
+    Validate *credentials* and return the corresponding ``User`` ORM instance.
 
-    Usage::
-
-        @router.get("/protected")
-        async def protected(user = Depends(get_current_user)):
-            ...
+    Raises ``HTTPException 401`` on any failure.  Extracted so that both
+    ``get_current_user`` and ``get_optional_user`` can share the same logic.
     """
     from sqlalchemy import select
     from backend.models.user import User
@@ -115,3 +112,43 @@ async def get_current_user(
         )
 
     return user
+
+
+# ---------------------------------------------------------------------------
+# FastAPI dependencies
+# ---------------------------------------------------------------------------
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    FastAPI dependency that validates the Bearer JWT and returns the
+    authenticated ``User`` ORM instance.
+
+    Usage::
+
+        @router.get("/protected")
+        async def protected(user = Depends(get_current_user)):
+            ...
+    """
+    return await _resolve_user_from_credentials(credentials, db)
+
+
+async def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme_optional),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Like ``get_current_user`` but returns ``None`` instead of raising 401
+    when no Bearer token is provided.
+
+    Use this for endpoints that work for both anonymous and authenticated callers.
+    """
+    if credentials is None:
+        return None
+    try:
+        return await _resolve_user_from_credentials(credentials, db)
+    except HTTPException:
+        return None

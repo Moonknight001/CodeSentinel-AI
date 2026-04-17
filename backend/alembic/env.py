@@ -39,6 +39,7 @@ if _db_url:
 
 from backend.models.database import Base  # noqa: E402
 import backend.models.user  # noqa: E402, F401 – registers User with Base.metadata
+import backend.models.code_submission  # noqa: E402, F401 – registers CodeSubmission with Base.metadata
 
 target_metadata = Base.metadata
 

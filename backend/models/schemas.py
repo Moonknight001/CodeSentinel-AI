@@ -208,3 +208,45 @@ class TokenResponse(BaseModel):
 
     model_config = {"populate_by_name": True}
 
+
+# ---------------------------------------------------------------------------
+# Code analysis
+# ---------------------------------------------------------------------------
+
+
+class SupportedLanguage(str, Enum):
+    """Languages accepted by the /analyze endpoint."""
+
+    PYTHON = "python"
+    JAVASCRIPT = "javascript"
+
+
+class AnalyzeRequest(BaseModel):
+    """Request body for POST /api/analyze."""
+
+    code: str = Field(
+        ...,
+        min_length=1,
+        max_length=100_000,
+        description="Raw source code to analyse (max 100 000 characters).",
+        alias="code",
+    )
+    language: SupportedLanguage = Field(
+        ...,
+        description="Programming language of the submitted code.",
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class AnalyzeResponse(BaseModel):
+    """Response returned by POST /api/analyze."""
+
+    submission_id: str = Field(..., alias="submissionId")
+    language: SupportedLanguage
+    status: ScanStatus
+    submitted_at: datetime = Field(..., alias="submittedAt")
+    message: str = "Code submission accepted. Analysis is queued."
+
+    model_config = {"populate_by_name": True, "from_attributes": True}
+
