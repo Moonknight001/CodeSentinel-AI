@@ -178,3 +178,33 @@ class HealthResponse(BaseModel):
     status: str = "ok"
     version: str
     timestamp: str
+
+
+# ---------------------------------------------------------------------------
+# Auth / User
+# ---------------------------------------------------------------------------
+
+
+class UserResponse(BaseModel):
+    """Public user profile returned by /api/auth/me."""
+
+    id: int
+    github_id: int = Field(..., alias="githubId")
+    username: str
+    email: Optional[str] = None
+    avatar_url: Optional[str] = Field(None, alias="avatarUrl")
+    name: Optional[str] = None
+    created_at: datetime = Field(..., alias="createdAt")
+
+    model_config = {"populate_by_name": True, "from_attributes": True}
+
+
+class TokenResponse(BaseModel):
+    """JWT token envelope returned after a successful OAuth callback."""
+
+    access_token: str = Field(..., alias="accessToken")
+    token_type: str = Field("bearer", alias="tokenType")
+    user: UserResponse
+
+    model_config = {"populate_by_name": True}
+

@@ -42,3 +42,8 @@ ACCEPTED_EXTENSIONS = {
 
 # Maximum upload size: 10 MB
 MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024
+
+# GitHub OAuth
+GITHUB_OAUTH_AUTHORIZE_URL = "https://github.com/login/oauth/authorize"
+GITHUB_OAUTH_TOKEN_URL = "https://github.com/login/oauth/access_token"
+GITHUB_API_BASE_URL = "https://api.github.com"
