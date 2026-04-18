@@ -236,6 +236,31 @@ class ScanResult(BaseModel):
     issues: List[ScanIssue] = []
 
 
+class AiReview(BaseModel):
+    """
+    AI-generated security review produced by the OpenAI layer.
+
+    Fields
+    ------
+    explanation:
+        Plain-English explanation of every detected security problem,
+        what makes it dangerous, and how an attacker could exploit it.
+    secure_version:
+        A corrected, security-hardened rewrite of the submitted code
+        with inline comments that explain each fix.
+    risk_score:
+        Overall risk rating from 1 (virtually no risk) to 10 (critical /
+        immediately exploitable), taking both severity and exploitability
+        into account.
+    """
+
+    explanation: str
+    secure_version: str
+    risk_score: int = Field(..., ge=1, le=10, alias="riskScore")
+
+    model_config = {"populate_by_name": True}
+
+
 class AnalyzeRequest(BaseModel):
     """Request body for POST /api/analyze."""
 
@@ -263,6 +288,7 @@ class AnalyzeResponse(BaseModel):
     submitted_at: datetime = Field(..., alias="submittedAt")
     message: str = "Code submission accepted. Analysis is queued."
     scan_result: ScanResult = Field(default_factory=ScanResult, alias="scanResult")
+    ai_review: Optional[AiReview] = Field(None, alias="aiReview")
 
     model_config = {"populate_by_name": True, "from_attributes": True}
 

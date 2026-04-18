@@ -21,6 +21,7 @@ from backend.models.schemas import (
 )
 from backend.models.user import User
 from backend.services import analyze_service
+from backend.services.ai_review_service import get_ai_review
 from backend.utils.security import get_optional_user
 
 router = APIRouter(tags=["analyze"])
@@ -75,6 +76,12 @@ async def analyze(
 
     scan_result = await analyze_service.run_scan(db, submission)
 
+    ai_review = await get_ai_review(
+        body.code,
+        body.language.value,
+        scan_result.issues,
+    )
+
     return ApiResponse(
         data=AnalyzeResponse(
             submissionId=submission.id,
@@ -82,6 +89,7 @@ async def analyze(
             status=ScanStatus(submission.status),
             submittedAt=submission.submitted_at,
             scanResult=scan_result,
+            aiReview=ai_review,
             message=(
                 f"Scan complete. {len(scan_result.issues)} issue(s) found."
                 if scan_result.issues
