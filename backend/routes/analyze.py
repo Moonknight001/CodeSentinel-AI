@@ -73,13 +73,21 @@ async def analyze(
         user_id=user_id,
     )
 
+    scan_result = await analyze_service.run_scan(db, submission)
+
     return ApiResponse(
         data=AnalyzeResponse(
             submissionId=submission.id,
             language=body.language,
-            status=ScanStatus.PENDING,
+            status=ScanStatus(submission.status),
             submittedAt=submission.submitted_at,
+            scanResult=scan_result,
+            message=(
+                f"Scan complete. {len(scan_result.issues)} issue(s) found."
+                if scan_result.issues
+                else "Scan complete. No issues found."
+            ),
         ),
-        message="Code submission accepted. Analysis is queued.",
+        message="Code submission accepted and analysed.",
         success=True,
     )

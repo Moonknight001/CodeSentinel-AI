@@ -221,6 +221,21 @@ class SupportedLanguage(str, Enum):
     JAVASCRIPT = "javascript"
 
 
+class ScanIssue(BaseModel):
+    """A single vulnerability finding from the scanner."""
+
+    type: str
+    line: int
+    severity: str
+    message: str
+
+
+class ScanResult(BaseModel):
+    """Structured output of the scanner engine."""
+
+    issues: List[ScanIssue] = []
+
+
 class AnalyzeRequest(BaseModel):
     """Request body for POST /api/analyze."""
 
@@ -247,6 +262,7 @@ class AnalyzeResponse(BaseModel):
     status: ScanStatus
     submitted_at: datetime = Field(..., alias="submittedAt")
     message: str = "Code submission accepted. Analysis is queued."
+    scan_result: ScanResult = Field(default_factory=ScanResult, alias="scanResult")
 
     model_config = {"populate_by_name": True, "from_attributes": True}
 
