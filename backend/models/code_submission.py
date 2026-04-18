@@ -9,8 +9,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.models.database import Base
@@ -45,6 +45,13 @@ class CodeSubmission(Base):
 
     # Processing state (pending → in_progress → completed / failed)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="pending")
+
+    # Scan result stored as JSONB (issues array + scoreResult).
+    # Populated by analyze_service.run_scan() once the scan completes.
+    result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
+    # Numeric security score (0–100) derived from the scan result.
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # Timestamps
     submitted_at: Mapped[datetime] = mapped_column(

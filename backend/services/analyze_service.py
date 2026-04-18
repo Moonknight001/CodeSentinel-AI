@@ -81,10 +81,6 @@ async def run_scan(
         await db.commit()
         raise
 
-    db.add(submission)
-    await db.commit()
-    await db.refresh(submission)
-
     pydantic_issues = [
         ScanIssue(
             type=issue.type,
@@ -95,7 +91,17 @@ async def run_scan(
         for issue in raw_result.issues
     ]
     score, label = compute_score([i.severity for i in raw_result.issues])
-    return ScanResult(
+    scan_result = ScanResult(
         issues=pydantic_issues,
         scoreResult=ScoreResult(score=score, label=label),
     )
+
+    # Persist the scan result and score so the row is fully queryable.
+    submission.result = scan_result.model_dump(mode="json")
+    submission.score = score
+
+    db.add(submission)
+    await db.commit()
+    await db.refresh(submission)
+
+    return scan_result
