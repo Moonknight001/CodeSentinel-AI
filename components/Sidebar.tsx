@@ -80,6 +80,23 @@ const SettingsIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+const AnalyzeIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    className={className}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.8}
+    aria-hidden="true"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+    />
+  </svg>
+);
+
 const ShieldIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
     className={className}
@@ -104,6 +121,7 @@ const ShieldIcon: React.FC<{ className?: string }> = ({ className }) => (
 const iconMap: Record<string, React.FC<{ className?: string }>> = {
   dashboard: DashboardIcon,
   upload: UploadIcon,
+  analyze: AnalyzeIcon,
   reports: ReportsIcon,
   settings: SettingsIcon,
 };

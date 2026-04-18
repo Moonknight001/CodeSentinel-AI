@@ -205,7 +205,7 @@ export default function UploadPage() {
             <div>
               <p className="font-semibold text-gray-900">Upload successful!</p>
               <p className="text-sm text-gray-500 mt-0.5">
-                Your file is being analysed. Results will appear in Reports.
+                Your file is being analyzed. Results will appear in Reports.
               </p>
             </div>
             <button type="button" onClick={handleReset} className="btn-secondary mt-1">

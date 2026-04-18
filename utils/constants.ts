@@ -10,6 +10,7 @@ export const ROUTES = {
   HOME: '/',
   DASHBOARD: '/dashboard',
   UPLOAD: '/upload',
+  ANALYZE: '/analyze',
   REPORTS: '/reports',
   SETTINGS: '/settings',
 } as const;
@@ -21,6 +22,7 @@ export const API_BASE_URL =
 // API endpoints
 export const API_ENDPOINTS = {
   UPLOAD: '/upload',
+  ANALYZE: '/analyze',
   SCAN: '/scan',
   REPORTS: '/reports',
   REPORT_DETAIL: (id: string) => `/reports/${id}`,
@@ -89,6 +91,11 @@ export const NAV_ITEMS = [
     label: 'Upload Code',
     href: ROUTES.UPLOAD,
     icon: 'upload',
+  },
+  {
+    label: 'Analyze',
+    href: ROUTES.ANALYZE,
+    icon: 'analyze',
   },
   {
     label: 'Reports',

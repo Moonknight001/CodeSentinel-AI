@@ -62,6 +62,21 @@ export interface UploadResponse {
   message: string;
 }
 
+export type AnalyzeLanguage = 'python' | 'javascript';
+
+export interface AnalyzeRequest {
+  code: string;
+  language: AnalyzeLanguage;
+}
+
+export interface AnalyzeResponse {
+  submissionId: string;
+  language: AnalyzeLanguage;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  submittedAt: string;
+  message: string;
+}
+
 export interface AppSettings {
   notifications: boolean;
   autoScan: boolean;
@@ -180,6 +195,25 @@ export async function saveSettings(
   });
 
   return handleResponse<AppSettings>(response);
+}
+
+// ---------------------------------------------------------------------------
+// Analyze API
+// ---------------------------------------------------------------------------
+
+/**
+ * Submit raw source code for security analysis.
+ */
+export async function analyzeCode(
+  payload: AnalyzeRequest
+): Promise<ApiResponse<AnalyzeResponse>> {
+  const response = await fetch(buildUrl(API_ENDPOINTS.ANALYZE), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse<AnalyzeResponse>(response);
 }
 
 // ---------------------------------------------------------------------------
