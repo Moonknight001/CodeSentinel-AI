@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  analyzeCode,
   fixCode,
   AnalyzeLanguage,
   AnalyzeResponse,
@@ -9,12 +8,12 @@ import {
   ScoreResult,
 } from '@/services/api';
 import DiffViewer from '@/components/DiffViewer';
+import { useAnalysisWebSocket } from '@/hooks/useAnalysisWebSocket';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type SubmitStatus = 'idle' | 'loading' | 'success' | 'error';
 type FixStatus = 'idle' | 'loading' | 'success' | 'error';
 
 const LANGUAGES: { value: AnalyzeLanguage; label: string }[] = [
@@ -56,8 +55,76 @@ function severityBadgeClass(severity: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// ScoreCard sub-component
+// Progress indicator sub-component
 // ---------------------------------------------------------------------------
+
+type ProgressStep = 'scanning' | 'analyzing' | 'completed';
+
+const PROGRESS_STEPS: { key: ProgressStep; label: string; desc: string }[] = [
+  { key: 'scanning', label: 'Scanning', desc: 'Running security scanner' },
+  { key: 'analyzing', label: 'Analyzing', desc: 'Running AI review' },
+  { key: 'completed', label: 'Complete', desc: 'Results ready' },
+];
+
+const ProgressTracker: React.FC<{
+  currentStage: 'scanning' | 'analyzing' | 'completed' | 'error';
+  statusMessage: string;
+}> = ({ currentStage, statusMessage }) => {
+  const stepOrder: ProgressStep[] = ['scanning', 'analyzing', 'completed'];
+  const activeIdx = stepOrder.indexOf(currentStage as ProgressStep);
+
+  return (
+    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3">
+      <div className="flex items-center gap-2 text-sm text-blue-700 font-medium">
+        {currentStage !== 'completed' && (
+          <svg className="h-4 w-4 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        )}
+        {currentStage === 'completed' && (
+          <svg className="h-4 w-4 flex-shrink-0 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        )}
+        <span>{statusMessage}</span>
+      </div>
+
+      {/* Step track */}
+      <ol className="flex items-center gap-0" aria-label="Analysis progress">
+        {PROGRESS_STEPS.map((step, idx) => {
+          const done = activeIdx > idx || currentStage === 'completed';
+          const active = step.key === currentStage && currentStage !== 'completed';
+          return (
+            <React.Fragment key={step.key}>
+              <li className="flex flex-col items-center gap-1 flex-shrink-0">
+                <div
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors
+                    ${done ? 'bg-green-500 text-white' : active ? 'bg-blue-600 text-white ring-2 ring-blue-300 ring-offset-1' : 'bg-gray-200 text-gray-500'}`}
+                  aria-current={active ? 'step' : undefined}
+                >
+                  {done ? (
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3} aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    idx + 1
+                  )}
+                </div>
+                <span className={`text-xs ${done ? 'text-green-700 font-medium' : active ? 'text-blue-700 font-medium' : 'text-gray-400'}`}>
+                  {step.label}
+                </span>
+              </li>
+              {idx < PROGRESS_STEPS.length - 1 && (
+                <div className={`flex-1 h-0.5 mt-[-1rem] mx-1 transition-colors ${done ? 'bg-green-400' : 'bg-gray-200'}`} aria-hidden="true" />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </ol>
+    </div>
+  );
+};
 
 const ScoreCard: React.FC<{ scoreResult: ScoreResult }> = ({ scoreResult }) => {
   const { score, label } = scoreResult;
@@ -97,48 +164,43 @@ const ScoreCard: React.FC<{ scoreResult: ScoreResult }> = ({ scoreResult }) => {
 const CodeAnalysisForm: React.FC = () => {
   const [code, setCode] = useState('');
   const [language, setLanguage] = useState<AnalyzeLanguage>('python');
-  const [status, setStatus] = useState<SubmitStatus>('idle');
-  const [result, setResult] = useState<AnalyzeResponse | null>(null);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [inputError, setInputError] = useState('');
 
   // Auto-fix state
   const [fixStatus, setFixStatus] = useState<FixStatus>('idle');
   const [fixResult, setFixResult] = useState<FixResponse | null>(null);
   const [fixError, setFixError] = useState('');
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // WebSocket-based real-time analysis
+  const { stage, statusMessage, result, errorMessage, analyze, reset } = useAnalysisWebSocket();
+
+  const isAnalyzing = stage === 'scanning' || stage === 'analyzing';
+  const isSuccess = stage === 'completed';
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Client-side validation
     if (!code.trim()) {
-      setErrorMessage('Please enter some code before submitting.');
+      setInputError('Please enter some code before submitting.');
       return;
     }
     if (code.length > MAX_CODE_CHARS) {
-      setErrorMessage(
+      setInputError(
         `Code exceeds the maximum allowed length of ${MAX_CODE_CHARS.toLocaleString()} characters.`
       );
       return;
     }
 
-    setStatus('loading');
-    setErrorMessage('');
-    setResult(null);
-    // Reset any prior fix result when re-analysing
+    setInputError('');
     setFixStatus('idle');
     setFixResult(null);
     setFixError('');
 
-    try {
-      const response: ApiResponse<AnalyzeResponse> = await analyzeCode({ code, language });
-      setResult(response.data);
-      setStatus('success');
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
-      setErrorMessage(message);
-      setStatus('error');
-    }
+    // Retrieve JWT from localStorage (set by GitHub OAuth flow)
+    const token =
+      typeof window !== 'undefined' ? localStorage.getItem('cs_token') ?? undefined : undefined;
+
+    analyze(code, language, token);
   };
 
   const handleFix = async () => {
@@ -161,15 +223,12 @@ const CodeAnalysisForm: React.FC = () => {
   const handleReset = () => {
     setCode('');
     setLanguage('python');
-    setStatus('idle');
-    setResult(null);
-    setErrorMessage('');
+    setInputError('');
     setFixStatus('idle');
     setFixResult(null);
     setFixError('');
+    reset();
   };
-
-  const isLoading = status === 'loading';
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-5">
@@ -185,7 +244,7 @@ const CodeAnalysisForm: React.FC = () => {
           id="language-select"
           value={language}
           onChange={(e) => setLanguage(e.target.value as AnalyzeLanguage)}
-          disabled={isLoading}
+          disabled={isAnalyzing}
           className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm
             text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2
             focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
@@ -211,13 +270,13 @@ const CodeAnalysisForm: React.FC = () => {
           value={code}
           onChange={(e) => {
             setCode(e.target.value);
-            if (errorMessage) setErrorMessage('');
+            if (inputError) setInputError('');
           }}
-          disabled={isLoading}
+          disabled={isAnalyzing}
           placeholder={`Paste your ${language === 'python' ? 'Python' : 'JavaScript'} code here…`}
           rows={18}
           spellCheck={false}
-          aria-describedby={errorMessage ? 'code-error' : undefined}
+          aria-describedby={inputError ? 'code-error' : undefined}
           className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5
             font-mono text-sm text-gray-900 shadow-sm placeholder-gray-400 resize-y
             focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500
@@ -229,10 +288,43 @@ const CodeAnalysisForm: React.FC = () => {
         </p>
       </div>
 
-      {/* Error message */}
-      {errorMessage && (
+      {/* Input validation error */}
+      {inputError && (
         <div
           id="code-error"
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3
+            text-sm text-red-700"
+        >
+          <svg
+            className="mt-0.5 h-4 w-4 flex-shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          {inputError}
+        </div>
+      )}
+
+      {/* Real-time progress tracker */}
+      {(isAnalyzing || isSuccess) && (
+        <ProgressTracker
+          currentStage={stage as 'scanning' | 'analyzing' | 'completed'}
+          statusMessage={statusMessage}
+        />
+      )}
+
+      {/* WebSocket error */}
+      {stage === 'error' && errorMessage && (
+        <div
           role="alert"
           className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3
             text-sm text-red-700"
@@ -256,7 +348,7 @@ const CodeAnalysisForm: React.FC = () => {
       )}
 
       {/* Success result */}
-      {status === 'success' && result && (
+      {isSuccess && result && (
         <div role="status" aria-live="polite" className="space-y-4">
 
           {/* Score card */}
@@ -406,40 +498,13 @@ const CodeAnalysisForm: React.FC = () => {
         </div>
       )}
 
-      {/* Submit button – hidden after success */}
-      {status !== 'success' && (
+      {/* Submit button – hidden while analyzing or after success */}
+      {!isSuccess && !isAnalyzing && (
         <button
           type="submit"
-          disabled={isLoading}
           className="btn-primary w-full py-3"
         >
-          {isLoading ? (
-            <span className="flex items-center gap-2">
-              <svg
-                className="h-4 w-4 animate-spin"
-                fill="none"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
-              Analyzing…
-            </span>
-          ) : (
-            'Analyze'
-          )}
+          Analyze
         </button>
       )}
     </form>
