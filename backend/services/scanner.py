@@ -157,6 +157,19 @@ def scan_code(code: str, language: str) -> ScanResult:
     """
     Scan *code* for security vulnerabilities and return a :class:`ScanResult`.
 
+    For Python code the function combines two complementary passes:
+
+    1. **Regex pass** – fast, line-by-line detection of SQL injection patterns,
+       hardcoded secrets, and unsafe function calls.
+    2. **AST pass** – AST-based detection of ``eval()``/``exec()`` calls,
+       insecure imports, and unsanitized ``input()`` usage.  The AST pass is
+       only applied when the language is ``"python"`` and ``ast.parse()``
+       succeeds; it is silently skipped on syntax errors so the regex results
+       are always returned.
+
+    Findings from both passes are merged and deduplicated by ``(line, type)``
+    so the same issue is never reported twice.
+
     Parameters
     ----------
     code:
@@ -167,12 +180,12 @@ def scan_code(code: str, language: str) -> ScanResult:
     Returns
     -------
     ScanResult
-        Contains a list of :class:`ScanIssue` objects, one per finding.
-        Empty list means no issues were detected.
+        Contains a list of :class:`ScanIssue` objects, one per finding,
+        sorted by line number.  An empty list means no issues were detected.
     """
     lang = language.strip().lower()
     issues: list[ScanIssue] = []
-    # Track (line, type) to avoid reporting the same category twice on one line.
+    # Track (line, type) to avoid reporting the same category twice.
     seen: set[tuple[int, str]] = set()
 
     def _add(lineno: int, issue_type: str, severity: str, message: str) -> None:
@@ -181,6 +194,9 @@ def scan_code(code: str, language: str) -> ScanResult:
             seen.add(key)
             issues.append(ScanIssue(type=issue_type, line=lineno, severity=severity, message=message))
 
+    # ----------------------------------------------------------------
+    # Regex pass (both Python and JavaScript)
+    # ----------------------------------------------------------------
     for lineno, raw_line in enumerate(code.splitlines(), start=1):
         line = raw_line
 
@@ -193,9 +209,7 @@ def scan_code(code: str, language: str) -> ScanResult:
         ):
             continue
 
-        # ----------------------------------------------------------------
         # SQL Injection checks
-        # ----------------------------------------------------------------
         if _RE_SQL_CONCAT.search(line):
             _add(
                 lineno,
@@ -232,9 +246,7 @@ def scan_code(code: str, language: str) -> ScanResult:
                 "use parameterised queries instead.",
             )
 
-        # ----------------------------------------------------------------
         # Hardcoded secrets checks
-        # ----------------------------------------------------------------
         if _RE_SECRET_ASSIGN.search(line):
             _add(
                 lineno,
@@ -253,9 +265,8 @@ def scan_code(code: str, language: str) -> ScanResult:
                 "store secrets securely in environment variables.",
             )
 
-        # ----------------------------------------------------------------
-        # Unsafe function checks
-        # ----------------------------------------------------------------
+        # Unsafe function checks (regex – kept for JavaScript and as a fast
+        # pre-filter for Python when AST parsing might be skipped)
         if _RE_EVAL.search(line):
             _add(
                 lineno,
@@ -292,4 +303,15 @@ def scan_code(code: str, language: str) -> ScanResult:
                 "pass a list of arguments with shell=False to prevent injection.",
             )
 
+    # ----------------------------------------------------------------
+    # AST pass – Python only; silently skipped on syntax errors
+    # ----------------------------------------------------------------
+    if lang == "python":
+        from backend.services.ast_scanner import ast_scan_python  # noqa: PLC0415
+
+        for ast_issue in ast_scan_python(code):
+            _add(ast_issue.line, ast_issue.type, ast_issue.severity, ast_issue.message)
+
+    # Return findings sorted by line number for a predictable output order.
+    issues.sort(key=lambda i: i.line)
     return ScanResult(issues=issues)
