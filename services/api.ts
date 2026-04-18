@@ -86,6 +86,12 @@ export interface ScanResult {
   scoreResult: ScoreResult;
 }
 
+export interface AiReview {
+  explanation: string;
+  secureVersion: string;
+  riskScore: number;
+}
+
 export interface AnalyzeResponse {
   submissionId: string;
   language: AnalyzeLanguage;
@@ -93,6 +99,18 @@ export interface AnalyzeResponse {
   submittedAt: string;
   message: string;
   scanResult: ScanResult;
+  aiReview?: AiReview;
+}
+
+export interface FixRequest {
+  code: string;
+  language: AnalyzeLanguage;
+}
+
+export interface FixResponse {
+  originalCode: string;
+  fixedCode: string;
+  summary: string;
 }
 
 export interface AppSettings {
@@ -232,6 +250,22 @@ export async function analyzeCode(
   });
 
   return handleResponse<AnalyzeResponse>(response);
+}
+
+/**
+ * Submit raw source code to the AI auto-fix engine.
+ * Returns the original code alongside a security-hardened rewrite.
+ */
+export async function fixCode(
+  payload: FixRequest
+): Promise<ApiResponse<FixResponse>> {
+  const response = await fetch(buildUrl(API_ENDPOINTS.FIX), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  return handleResponse<FixResponse>(response);
 }
 
 // ---------------------------------------------------------------------------

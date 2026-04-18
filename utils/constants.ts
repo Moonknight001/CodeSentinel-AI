@@ -23,6 +23,7 @@ export const API_BASE_URL =
 export const API_ENDPOINTS = {
   UPLOAD: '/upload',
   ANALYZE: '/analyze',
+  FIX: '/fix',
   SCAN: '/scan',
   REPORTS: '/reports',
   REPORT_DETAIL: (id: string) => `/reports/${id}`,

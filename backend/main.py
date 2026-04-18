@@ -16,7 +16,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.routes import health, upload, scan, reports, settings, auth, analyze
+from backend.routes import health, upload, scan, reports, settings, auth, analyze, fix
 from backend.utils.constants import API_PREFIX, APP_DESCRIPTION, APP_NAME, APP_VERSION
 from backend.utils.helpers import get_cors_origins
 
@@ -56,6 +56,7 @@ app.include_router(reports.router, prefix=API_PREFIX)
 app.include_router(settings.router, prefix=API_PREFIX)
 app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(analyze.router, prefix=API_PREFIX)
+app.include_router(fix.router, prefix=API_PREFIX)
 
 
 # ---------------------------------------------------------------------------

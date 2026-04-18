@@ -300,6 +300,38 @@ class AnalyzeRequest(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+# ---------------------------------------------------------------------------
+# Auto-fix
+# ---------------------------------------------------------------------------
+
+
+class FixRequest(BaseModel):
+    """Request body for POST /api/fix."""
+
+    code: str = Field(
+        ...,
+        min_length=1,
+        max_length=100_000,
+        description="Raw source code to fix (max 100 000 characters).",
+    )
+    language: SupportedLanguage = Field(
+        ...,
+        description="Programming language of the submitted code.",
+    )
+
+    model_config = {"populate_by_name": True}
+
+
+class FixResponse(BaseModel):
+    """Response returned by POST /api/fix."""
+
+    original_code: str = Field(..., alias="originalCode")
+    fixed_code: str = Field(..., alias="fixedCode")
+    summary: str = "No changes were necessary."
+
+    model_config = {"populate_by_name": True}
+
+
 class AnalyzeResponse(BaseModel):
     """Response returned by POST /api/analyze."""
 
