@@ -11,6 +11,7 @@ export const ROUTES = {
   DASHBOARD: '/dashboard',
   UPLOAD: '/upload',
   ANALYZE: '/analyze',
+  GITHUB: '/github',
   REPORTS: '/reports',
   SETTINGS: '/settings',
 } as const;
@@ -29,6 +30,10 @@ export const API_ENDPOINTS = {
   REPORT_DETAIL: (id: string) => `/reports/${id}`,
   SETTINGS: '/settings',
   HEALTH: '/health',
+  GITHUB_REPOS: '/github/repos',
+  GITHUB_REPO_TREE: (owner: string, repo: string) => `/github/repos/${owner}/${repo}/tree`,
+  GITHUB_REPO_CONTENTS: (owner: string, repo: string) =>
+    `/github/repos/${owner}/${repo}/contents`,
 } as const;
 
 // Severity levels for vulnerability findings
@@ -97,6 +102,11 @@ export const NAV_ITEMS = [
     label: 'Analyze',
     href: ROUTES.ANALYZE,
     icon: 'analyze',
+  },
+  {
+    label: 'GitHub Repos',
+    href: ROUTES.GITHUB,
+    icon: 'github',
   },
   {
     label: 'Reports',

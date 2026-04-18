@@ -3,12 +3,13 @@ Auth routes.
 
 GET  /api/auth/login     – redirect the browser to the GitHub OAuth consent page
 GET  /api/auth/callback  – receive the OAuth code, exchange it, store the user,
-                           return a JWT
+                           return a JWT (or redirect to FRONTEND_URL when set)
 GET  /api/auth/me        – return the profile of the currently authenticated user
 """
 
 from __future__ import annotations
 
+import os
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -87,6 +88,13 @@ async def callback(
 
     jwt_token = create_access_token({"sub": str(user.id)})
     user_response = UserResponse.model_validate(user)
+
+    # If FRONTEND_URL is configured, redirect the browser back to the frontend
+    # with the JWT so the Next.js GitHub integration page can pick it up.
+    frontend_url = os.getenv("FRONTEND_URL", "").rstrip("/")
+    if frontend_url:
+        redirect_target = f"{frontend_url}/github?token={jwt_token}"
+        return RedirectResponse(url=redirect_target, status_code=status.HTTP_302_FOUND)
 
     return ApiResponse(
         data=TokenResponse(

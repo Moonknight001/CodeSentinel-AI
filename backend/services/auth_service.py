@@ -36,8 +36,10 @@ GITHUB_OAUTH_TOKEN_URL = "https://github.com/login/oauth/access_token"
 GITHUB_API_USER_URL = "https://api.github.com/user"
 GITHUB_API_EMAILS_URL = "https://api.github.com/user/emails"
 
-# Scopes requested from GitHub
-GITHUB_SCOPES = "read:user user:email"
+# Scopes requested from GitHub.
+# public_repo allows reading public repository contents and trees,
+# which is required for the GitHub repo integration feature.
+GITHUB_SCOPES = "read:user user:email public_repo"
 
 # ---------------------------------------------------------------------------
 # Public helpers

@@ -113,8 +113,33 @@ export interface FixResponse {
   summary: string;
 }
 
+export interface GithubRepo {
+  id: number;
+  name: string;
+  fullName: string;
+  description: string | null;
+  private: boolean;
+  htmlUrl: string;
+  language: string | null;
+  defaultBranch: string;
+  updatedAt: string | null;
+  stargazersCount: number;
+}
+
+export interface GithubFileEntry {
+  path: string;
+  name: string;
+  language: 'python' | 'javascript';
+}
+
+export interface GithubFileContent {
+  path: string;
+  content: string;
+  language: 'python' | 'javascript';
+  size: number;
+}
+
 export interface AppSettings {
-  notifications: boolean;
   autoScan: boolean;
   reportFormat: 'pdf' | 'json' | 'csv';
   theme: 'light' | 'dark' | 'system';
@@ -282,4 +307,65 @@ export async function healthCheck(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// GitHub integration API
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch the authenticated user's GitHub repositories.
+ * Requires a valid JWT passed as the Bearer token.
+ */
+export async function getGithubRepos(token: string): Promise<ApiResponse<GithubRepo[]>> {
+  const response = await fetch(buildUrl(API_ENDPOINTS.GITHUB_REPOS), {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return handleResponse<GithubRepo[]>(response);
+}
+
+/**
+ * List Python and JavaScript files in a specific repository.
+ * Requires a valid JWT passed as the Bearer token.
+ */
+export async function getRepoFiles(
+  token: string,
+  owner: string,
+  repo: string
+): Promise<ApiResponse<GithubFileEntry[]>> {
+  const response = await fetch(buildUrl(API_ENDPOINTS.GITHUB_REPO_TREE(owner, repo)), {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return handleResponse<GithubFileEntry[]>(response);
+}
+
+/**
+ * Fetch the decoded content of a single file from a repository.
+ * Requires a valid JWT passed as the Bearer token.
+ */
+export async function getFileContent(
+  token: string,
+  owner: string,
+  repo: string,
+  path: string
+): Promise<ApiResponse<GithubFileContent>> {
+  const url =
+    buildUrl(API_ENDPOINTS.GITHUB_REPO_CONTENTS(owner, repo)) +
+    `?path=${encodeURIComponent(path)}`;
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return handleResponse<GithubFileContent>(response);
 }

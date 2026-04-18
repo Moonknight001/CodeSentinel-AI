@@ -345,3 +345,46 @@ class AnalyzeResponse(BaseModel):
 
     model_config = {"populate_by_name": True, "from_attributes": True}
 
+
+# ---------------------------------------------------------------------------
+# GitHub integration
+# ---------------------------------------------------------------------------
+
+
+class GitHubRepo(BaseModel):
+    """A single GitHub repository entry returned by /api/github/repos."""
+
+    id: int
+    name: str
+    full_name: str = Field(..., alias="fullName")
+    description: Optional[str] = None
+    private: bool = False
+    html_url: str = Field(..., alias="htmlUrl")
+    language: Optional[str] = None
+    default_branch: str = Field("main", alias="defaultBranch")
+    updated_at: Optional[str] = Field(None, alias="updatedAt")
+    stargazers_count: int = Field(0, alias="stargazersCount")
+
+    model_config = {"populate_by_name": True}
+
+
+class GitHubFileEntry(BaseModel):
+    """A single file entry in a repository tree."""
+
+    path: str
+    name: str
+    language: str  # "python" | "javascript"
+
+    model_config = {"populate_by_name": True}
+
+
+class GitHubFileContent(BaseModel):
+    """Decoded content of a single file fetched from GitHub."""
+
+    path: str
+    content: str
+    language: str  # "python" | "javascript"
+    size: int = 0
+
+    model_config = {"populate_by_name": True}
+
