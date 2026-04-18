@@ -230,10 +230,31 @@ class ScanIssue(BaseModel):
     message: str
 
 
+class ScoreResult(BaseModel):
+    """
+    Code quality score derived from the scanner findings.
+
+    The score starts at 100 and is reduced by:
+      * 20 points per CRITICAL or HIGH severity issue
+      * 10 points per MEDIUM severity issue
+      *  5 points per LOW severity issue
+
+    Labels:  >= 90 → Excellent · >= 70 → Good · >= 50 → Fair · < 50 → خطر
+    """
+
+    score: int = Field(100, ge=0, le=100)
+    label: str = "Excellent"
+
+
 class ScanResult(BaseModel):
     """Structured output of the scanner engine."""
 
     issues: List[ScanIssue] = []
+    score_result: ScoreResult = Field(
+        default_factory=ScoreResult, alias="scoreResult"
+    )
+
+    model_config = {"populate_by_name": True}
 
 
 class AiReview(BaseModel):

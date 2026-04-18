@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { analyzeCode, AnalyzeLanguage, AnalyzeResponse, ApiResponse } from '@/services/api';
+import { analyzeCode, AnalyzeLanguage, AnalyzeResponse, ApiResponse, ScoreResult } from '@/services/api';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -13,6 +13,72 @@ const LANGUAGES: { value: AnalyzeLanguage; label: string }[] = [
 ];
 
 const MAX_CODE_CHARS = 100_000;
+
+// ---------------------------------------------------------------------------
+// Score display helpers
+// ---------------------------------------------------------------------------
+
+function scoreColorClasses(label: string): { bg: string; text: string; border: string } {
+  switch (label) {
+    case 'Excellent':
+      return { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' };
+    case 'Good':
+      return { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' };
+    case 'Fair':
+      return { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200' };
+    default: // خطر
+      return { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' };
+  }
+}
+
+function severityBadgeClass(severity: string): string {
+  switch (severity.toUpperCase()) {
+    case 'CRITICAL':
+    case 'HIGH':
+      return 'bg-red-100 text-red-800';
+    case 'MEDIUM':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'LOW':
+      return 'bg-green-100 text-green-800';
+    default:
+      return 'bg-gray-100 text-gray-600';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// ScoreCard sub-component
+// ---------------------------------------------------------------------------
+
+const ScoreCard: React.FC<{ scoreResult: ScoreResult }> = ({ scoreResult }) => {
+  const { score, label } = scoreResult;
+  const colors = scoreColorClasses(label);
+
+  return (
+    <div className={`rounded-lg border ${colors.border} ${colors.bg} p-4 flex items-center gap-4`}>
+      {/* Numeric score */}
+      <div className="flex-shrink-0 text-center">
+        <span className={`text-4xl font-extrabold ${colors.text}`}>{score}</span>
+        <p className={`text-xs font-medium ${colors.text} mt-0.5`}>/ 100</p>
+      </div>
+      {/* Divider */}
+      <div className={`w-px self-stretch ${colors.border} border-l`} />
+      {/* Label */}
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Security Score</p>
+        <p className={`text-lg font-bold ${colors.text} mt-0.5`}>{label}</p>
+        <p className="text-xs text-gray-500 mt-0.5">
+          {score >= 90
+            ? 'No significant issues detected.'
+            : score >= 70
+            ? 'Minor issues found — review recommended.'
+            : score >= 50
+            ? 'Several issues detected — action advised.'
+            : 'Critical issues detected — immediate action required.'}
+        </p>
+      </div>
+    </div>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -152,44 +218,89 @@ const CodeAnalysisForm: React.FC = () => {
 
       {/* Success result */}
       {status === 'success' && result && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="rounded-lg border border-green-200 bg-green-50 p-4 space-y-2"
-        >
-          <div className="flex items-center gap-2 text-green-700">
-            <svg
-              className="h-5 w-5 flex-shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span className="font-semibold text-sm">Submission accepted!</span>
+        <div role="status" aria-live="polite" className="space-y-4">
+
+          {/* Score card */}
+          {result.scanResult?.scoreResult && (
+            <ScoreCard scoreResult={result.scanResult.scoreResult} />
+          )}
+
+          {/* Submission metadata */}
+          <div className="rounded-lg border border-green-200 bg-green-50 p-4 space-y-2">
+            <div className="flex items-center gap-2 text-green-700">
+              <svg
+                className="h-5 w-5 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span className="font-semibold text-sm">Scan complete!</span>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+              <dt className="font-medium text-gray-500">Submission ID</dt>
+              <dd className="font-mono truncate" title={result.submissionId}>
+                {result.submissionId}
+              </dd>
+              <dt className="font-medium text-gray-500">Language</dt>
+              <dd className="capitalize">{result.language}</dd>
+              <dt className="font-medium text-gray-500">Status</dt>
+              <dd className="capitalize">{result.status.replace('_', ' ')}</dd>
+              <dt className="font-medium text-gray-500">Submitted at</dt>
+              <dd>{new Date(result.submittedAt).toLocaleString()}</dd>
+              {result.scanResult && (
+                <>
+                  <dt className="font-medium text-gray-500">Issues found</dt>
+                  <dd>{result.scanResult.issues.length}</dd>
+                </>
+              )}
+            </dl>
           </div>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
-            <dt className="font-medium text-gray-500">Submission ID</dt>
-            <dd className="font-mono truncate" title={result.submissionId}>
-              {result.submissionId}
-            </dd>
-            <dt className="font-medium text-gray-500">Language</dt>
-            <dd className="capitalize">{result.language}</dd>
-            <dt className="font-medium text-gray-500">Status</dt>
-            <dd className="capitalize">{result.status.replace('_', ' ')}</dd>
-            <dt className="font-medium text-gray-500">Submitted at</dt>
-            <dd>{new Date(result.submittedAt).toLocaleString()}</dd>
-          </dl>
+
+          {/* Issue list */}
+          {result.scanResult?.issues && result.scanResult.issues.length > 0 && (
+            <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                <h4 className="text-sm font-semibold text-gray-900">
+                  Detected Issues ({result.scanResult.issues.length})
+                </h4>
+              </div>
+              <ul className="divide-y divide-gray-100">
+                {result.scanResult.issues.map((issue, idx) => (
+                  <li key={idx} className="px-4 py-3 flex items-start gap-3">
+                    <span
+                      className={`mt-0.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${severityBadgeClass(issue.severity)}`}
+                    >
+                      {issue.severity}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-800">{issue.type}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{issue.message}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">Line {issue.line}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {result.scanResult?.issues && result.scanResult.issues.length === 0 && (
+            <p className="text-sm text-green-700 font-medium text-center py-2">
+              ✅ No issues detected — code looks clean!
+            </p>
+          )}
+
           <button
             type="button"
             onClick={handleReset}
-            className="btn-secondary mt-2 text-xs"
+            className="btn-secondary w-full text-xs"
           >
             Analyze another snippet
           </button>

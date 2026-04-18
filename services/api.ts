@@ -69,12 +69,30 @@ export interface AnalyzeRequest {
   language: AnalyzeLanguage;
 }
 
+export interface ScoreResult {
+  score: number;
+  label: string;
+}
+
+export interface ScanIssueResult {
+  type: string;
+  line: number;
+  severity: string;
+  message: string;
+}
+
+export interface ScanResult {
+  issues: ScanIssueResult[];
+  scoreResult: ScoreResult;
+}
+
 export interface AnalyzeResponse {
   submissionId: string;
   language: AnalyzeLanguage;
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
   submittedAt: string;
   message: string;
+  scanResult: ScanResult;
 }
 
 export interface AppSettings {

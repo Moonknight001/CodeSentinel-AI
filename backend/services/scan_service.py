@@ -20,6 +20,7 @@ from backend.models.schemas import (
     Vulnerability,
     SeverityLevel,
 )
+from backend.services.scoring_service import compute_score
 from backend.utils.constants import ACCEPTED_EXTENSIONS, SUPPORTED_LANGUAGES
 
 
@@ -120,7 +121,7 @@ def run_stub_scan(scan_id: str) -> Optional[ScanReport]:
         medium=sum(1 for v in vulns if v.severity == SeverityLevel.MEDIUM),
         low=sum(1 for v in vulns if v.severity == SeverityLevel.LOW),
         info=sum(1 for v in vulns if v.severity == SeverityLevel.INFO),
-        securityScore=62,
+        securityScore=compute_score([v.severity.value for v in vulns])[0],
     )
 
     report = report.model_copy(

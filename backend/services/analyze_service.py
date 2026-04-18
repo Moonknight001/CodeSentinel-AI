@@ -10,8 +10,9 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.code_submission import CodeSubmission
-from backend.models.schemas import ScanIssue, ScanResult
+from backend.models.schemas import ScanIssue, ScanResult, ScoreResult
 from backend.services.scanner import scan_code
+from backend.services.scoring_service import compute_score
 
 
 async def create_submission(
@@ -84,14 +85,17 @@ async def run_scan(
     await db.commit()
     await db.refresh(submission)
 
+    pydantic_issues = [
+        ScanIssue(
+            type=issue.type,
+            line=issue.line,
+            severity=issue.severity,
+            message=issue.message,
+        )
+        for issue in raw_result.issues
+    ]
+    score, label = compute_score([i.severity for i in raw_result.issues])
     return ScanResult(
-        issues=[
-            ScanIssue(
-                type=issue.type,
-                line=issue.line,
-                severity=issue.severity,
-                message=issue.message,
-            )
-            for issue in raw_result.issues
-        ]
+        issues=pydantic_issues,
+        scoreResult=ScoreResult(score=score, label=label),
     )
