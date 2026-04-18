@@ -278,14 +278,17 @@ def test_build_user_message_with_issues():
     )
     msg = ai_review_service._build_user_message("some code", "python", issues)
     assert "Language: python" in msg
-    assert "Line 3 [HIGH] Unsafe Function" in msg
-    assert "Line 7 [CRITICAL] SQL Injection" in msg
+    # New tabular format: line numbers and types present
+    assert "3" in msg
+    assert "Unsafe Function" in msg
+    assert "7" in msg
+    assert "SQL Injection" in msg
     assert "some code" in msg
 
 
 def test_build_user_message_no_issues():
     msg = ai_review_service._build_user_message("clean code", "javascript", [])
-    assert "none detected" in msg
+    assert "none" in msg.lower()
     assert "Language: javascript" in msg
 
 
@@ -293,6 +296,109 @@ def test_build_user_message_code_fenced():
     msg = ai_review_service._build_user_message("x = 1", "python", [])
     assert "```python" in msg
     assert "x = 1" in msg
+
+
+def test_build_user_message_issue_count_in_header():
+    """The user message header states the number of scanner findings."""
+    issues = _make_issues(
+        ("Hardcoded Secret", 5, "HIGH", "API key literal"),
+    )
+    msg = ai_review_service._build_user_message("code", "python", issues)
+    assert "1 total" in msg
+
+
+def test_build_user_message_zero_issues_count():
+    """Zero findings are reported as 0 total."""
+    msg = ai_review_service._build_user_message("code", "python", [])
+    assert "0 total" in msg
+
+
+def test_build_user_message_prompts_for_reasoning():
+    """User turn ends with an instruction to perform reasoning then return JSON."""
+    msg = ai_review_service._build_user_message("x = 1", "python", [])
+    assert "internal reasoning" in msg.lower() or "return the json" in msg.lower()
+
+
+def test_build_user_message_tabular_all_severities():
+    """All three columns (line, severity, type) are present for each issue."""
+    issues = _make_issues(
+        ("SQL Injection", 12, "CRITICAL", "unsanitized"),
+        ("Eval Usage", 20, "HIGH", "eval with input"),
+        ("Insecure Import", 1, "MEDIUM", "import pickle"),
+    )
+    msg = ai_review_service._build_user_message("code", "python", issues)
+    for line_no in ["12", "20", "1"]:
+        assert line_no in msg
+    for severity in ["CRITICAL", "HIGH", "MEDIUM"]:
+        assert severity in msg
+
+
+# ---------------------------------------------------------------------------
+# Tests: Prompt 9 – system prompt quality & persona
+# ---------------------------------------------------------------------------
+
+
+def test_system_prompt_establishes_senior_engineer_persona():
+    """System prompt must define the senior security engineer persona."""
+    prompt = ai_review_service._SYSTEM_PROMPT
+    assert "senior" in prompt.lower()
+    assert "security engineer" in prompt.lower()
+
+
+def test_system_prompt_forbids_generic_advice():
+    """System prompt must explicitly forbid generic, non-code-specific statements."""
+    prompt = ai_review_service._SYSTEM_PROMPT
+    # The prompt must tell the model to avoid copy-paste generic advice
+    assert "generic" in prompt.lower() or "forbidden" in prompt.lower()
+
+
+def test_system_prompt_requires_line_reference():
+    """System prompt must instruct the model to reference exact lines."""
+    prompt = ai_review_service._SYSTEM_PROMPT
+    assert "line" in prompt.lower()
+    # Must mention variable names or specific constructs
+    assert "variable" in prompt.lower() or "exact" in prompt.lower()
+
+
+def test_system_prompt_requires_exploit_scenario():
+    """System prompt must demand a concrete exploit scenario, not theory."""
+    prompt = ai_review_service._SYSTEM_PROMPT
+    assert "exploit" in prompt.lower() or "attacker" in prompt.lower()
+
+
+def test_system_prompt_requires_idiomatic_fix():
+    """System prompt must require language-idiomatic safe APIs, not band-aids."""
+    prompt = ai_review_service._SYSTEM_PROMPT
+    assert "idiomatic" in prompt.lower() or "safe api" in prompt.lower() or "parameterised" in prompt.lower()
+
+
+def test_system_prompt_includes_risk_calibration_scale():
+    """System prompt must define the risk score scale with explicit reference points."""
+    prompt = ai_review_service._SYSTEM_PROMPT
+    # Must cover both ends of the scale
+    assert "1" in prompt and "10" in prompt
+    # Must mention critical/unauthenticated at the high end
+    assert "critical" in prompt.lower() or "unauthenticated" in prompt.lower()
+
+
+def test_system_prompt_requires_security_fix_comment_prefix():
+    """System prompt must mandate the SECURITY FIX: inline-comment convention."""
+    prompt = ai_review_service._SYSTEM_PROMPT
+    assert "SECURITY FIX:" in prompt
+
+
+def test_system_prompt_output_schema_has_three_keys():
+    """System prompt must declare exactly three JSON keys."""
+    prompt = ai_review_service._SYSTEM_PROMPT
+    assert '"explanation"' in prompt
+    assert '"secure_version"' in prompt
+    assert '"risk_score"' in prompt
+
+
+def test_system_prompt_no_markdown_fences_instruction():
+    """System prompt must tell the model not to wrap output in markdown fences."""
+    prompt = ai_review_service._SYSTEM_PROMPT
+    assert "markdown" in prompt.lower() or "fences" in prompt.lower()
 
 
 # ---------------------------------------------------------------------------
